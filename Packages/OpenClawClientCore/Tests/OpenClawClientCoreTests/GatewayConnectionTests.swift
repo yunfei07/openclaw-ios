@@ -21,7 +21,9 @@ final class MockWebSocket: OpenClawClientCore.WebSocketTasking, @unchecked Senda
     }
 
     func receive() async throws -> URLSessionWebSocketTask.Message {
-        if inbound.isEmpty { throw NSError(domain: "Mock", code: 1) }
+        while inbound.isEmpty {
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
         return inbound.removeFirst()
     }
 
@@ -65,6 +67,67 @@ struct GatewayConnectionTests {
             let frame = GatewayFrame.res(payload)
             guard let resData = try? JSONEncoder().encode(frame) else { return nil }
             return .data(resData)
+        }
+
+        let result = try await conn.request(method: "health", payload: Data())
+        let decoded = try JSONDecoder().decode(AnyCodable.self, from: result)
+        #expect(decoded.value as? [String: AnyCodable] != nil)
+    }
+
+    @Test func eventStreamEmitsChatEvent() async throws {
+        let socket = MockWebSocket()
+        let tokenStore = RecordingTokenStore()
+        let identityStore = DeviceIdentityStore(rootURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let conn = GatewayConnection(url: URL(string: "ws://127.0.0.1:18789")!, tokenStore: tokenStore, identityStore: identityStore, socket: socket)
+
+        let payload: [String: AnyCodable] = [
+            "runId": AnyCodable("run-1"),
+            "sessionKey": AnyCodable("main"),
+            "state": AnyCodable("delta")
+        ]
+        let evt = GatewayFrame.event(EventFrame(type: "event", event: "chat", payload: AnyCodable(payload), seq: 1, stateversion: nil))
+        socket.inbound.append(.data(try JSONEncoder().encode(evt)))
+
+        let stream = await conn.events()
+        var iterator = stream.makeAsyncIterator()
+        let next = await iterator.next()
+        #expect(next?.event == "chat")
+    }
+
+    @Test func requestReturnsEvenWhenEventArrivesFirst() async throws {
+        let socket = MockWebSocket()
+        let tokenStore = RecordingTokenStore()
+        let identityStore = DeviceIdentityStore(rootURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let conn = GatewayConnection(url: URL(string: "ws://127.0.0.1:18789")!, tokenStore: tokenStore, identityStore: identityStore, socket: socket)
+
+        socket.onSend = { message in
+            guard case let .data(data) = message else { return nil }
+            guard let req = try? JSONDecoder().decode(RequestFrame.self, from: data) else { return nil }
+            let eventFrame = GatewayFrame.event(
+                EventFrame(
+                    type: "event",
+                    event: "chat",
+                    payload: AnyCodable(["runId": AnyCodable("run-1"), "sessionKey": AnyCodable("main")]),
+                    seq: 1,
+                    stateversion: nil
+                )
+            )
+            let resFrame = GatewayFrame.res(
+                ResponseFrame(
+                    type: "res",
+                    id: req.id,
+                    ok: true,
+                    payload: AnyCodable(["ok": AnyCodable(true)]),
+                    error: nil
+                )
+            )
+            if let eventData = try? JSONEncoder().encode(eventFrame) {
+                socket.inbound.append(.data(eventData))
+            }
+            if let resData = try? JSONEncoder().encode(resFrame) {
+                socket.inbound.append(.data(resData))
+            }
+            return nil
         }
 
         let result = try await conn.request(method: "health", payload: Data())
