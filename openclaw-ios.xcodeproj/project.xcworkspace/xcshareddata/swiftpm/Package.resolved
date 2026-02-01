@@ -1,0 +1,15 @@
+{
+  "originHash" : "d3d326e9de1d3396a2e99ae9e926bac35b0eb4b9fccbc1c94e631aa9e529f57b",
+  "pins" : [
+    {
+      "identity" : "openclaw-ios-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/yunfei07/openclaw-ios-sdk.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "8fd5e3731fcd8ee7de2c7aecb61254bf8ca0eba8"
+      }
+    }
+  ],
+  "version" : 3
+}

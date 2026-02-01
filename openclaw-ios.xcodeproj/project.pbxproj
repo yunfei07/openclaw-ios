@@ -101,7 +101,7 @@
 			mainGroup = E8107F472F2CECB2005D5869;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				1B39B664A54E2BCA37CCB18C /* OpenClawClientCore */,
+				1B39B664A54E2BCA37CCB18C /* XCLocalSwiftPackageReference "Packages/OpenClawClientCore" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E8107F512F2CECB2005D5869 /* Products */;
@@ -132,21 +132,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		1B39B664A54E2BCA37CCB18C /* OpenClawClientCore */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/OpenClawClientCore;
-		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		726D60BF053990FAB4AAFC36 /* OpenClawClientCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 1B39B664A54E2BCA37CCB18C /* OpenClawClientCore */;
-			productName = OpenClawClientCore;
-		};
-/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		E8107F592F2CECB4005D5869 /* Debug */ = {
@@ -279,7 +264,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = JKNM3EVDKU;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Config/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -311,7 +297,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = JKNM3EVDKU;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Config/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -356,6 +343,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		1B39B664A54E2BCA37CCB18C /* XCLocalSwiftPackageReference "Packages/OpenClawClientCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/OpenClawClientCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		726D60BF053990FAB4AAFC36 /* OpenClawClientCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1B39B664A54E2BCA37CCB18C /* XCLocalSwiftPackageReference "Packages/OpenClawClientCore" */;
+			productName = OpenClawClientCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E8107F482F2CECB2005D5869 /* Project object */;
 }
