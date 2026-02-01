@@ -44,7 +44,7 @@ private final class PendingResponse: @unchecked Sendable {
     }
 }
 
-public actor GatewayConnection: GatewayRequesting {
+public actor GatewayConnection: GatewayRequesting, GatewayEventStreaming {
     private let url: URL
     private let tokenStore: TokenStoring
     private let identityStore: DeviceIdentityStore
@@ -74,7 +74,7 @@ public actor GatewayConnection: GatewayRequesting {
         }
     }
 
-    public func events() -> AsyncStream<EventFrame> {
+    public func events() async -> AsyncStream<EventFrame> {
         if let eventStream { return eventStream }
         let stream = AsyncStream<EventFrame> { continuation in
             eventContinuation = continuation

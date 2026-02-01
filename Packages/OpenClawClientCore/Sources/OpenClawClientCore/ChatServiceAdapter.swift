@@ -2,10 +2,16 @@ import Foundation
 import OpenClawSDK
 import OpenClawProtocol
 
+public protocol GatewayEventStreaming: Sendable {
+    func events() async -> AsyncStream<EventFrame>
+}
+
 public struct ChatServiceAdapter: ChatServiceType, Sendable {
     private let service: ChatService
+    private let gateway: GatewayEventStreaming
 
-    public init(gateway: GatewayRequesting) {
+    public init(gateway: GatewayRequesting & GatewayEventStreaming) {
+        self.gateway = gateway
         self.service = ChatService(gateway: gateway)
     }
 
@@ -21,5 +27,19 @@ public struct ChatServiceAdapter: ChatServiceType, Sendable {
 
     public func abort(sessionKey: String, runId: String?) async throws {
         _ = try await service.abort(sessionKey: sessionKey, runId: runId)
+    }
+
+    public func events() -> AsyncStream<ChatEvent> {
+        return AsyncStream { continuation in
+            Task {
+                let base = await gateway.events()
+                for await event in base {
+                    if let mapped = ChatEventMapper.from(event: event) {
+                        continuation.yield(mapped)
+                    }
+                }
+                continuation.finish()
+            }
+        }
     }
 }
