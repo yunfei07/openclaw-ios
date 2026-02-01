@@ -36,13 +36,17 @@ struct openclaw_iosApp: App {
             let token = await MainActor.run {
                 settingsVM.gatewayToken.isEmpty ? nil : settingsVM.gatewayToken
             }
+            let useDeviceIdentity = token == nil
             await MainActor.run {
                 chatVM.connectionState = "connecting"
                 chatVM.errorMessage = nil
             }
             do {
-                try await connection.connect(sharedToken: token)
-                await MainActor.run { chatVM.connectionState = "connected" }
+                try await connection.connect(sharedToken: token, useDeviceIdentity: useDeviceIdentity)
+                await MainActor.run {
+                    chatVM.connectionState = "connected"
+                    chatVM.startStreaming()
+                }
                 try await chatVM.loadHistory()
             } catch {
                 await MainActor.run {

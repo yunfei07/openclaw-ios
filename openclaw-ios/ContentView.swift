@@ -103,6 +103,11 @@ private struct PreviewChatService: ChatServiceType, Sendable {
         ChatSendResult(runId: "preview", status: "started")
     }
     func abort(sessionKey: String, runId: String?) async throws {}
+    func events() -> AsyncStream<ChatEvent> {
+        AsyncStream { continuation in
+            continuation.finish()
+        }
+    }
 }
 
 @MainActor
