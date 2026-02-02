@@ -21,23 +21,58 @@ public protocol ChatServiceType: Sendable {
 @MainActor
 @Observable
 public final class ChatViewModel {
-    public var messages: [ChatMessage] = []
+    public var messages: [ChatMessage] = [] {
+        didSet {
+            persistMessages()
+        }
+    }
     public var inputText: String = ""
     public var connectionState: String = "disconnected"
     public var errorMessage: String? = nil
 
     private let chat: ChatServiceType
-    private let sessionKey = "main"
+    private let sessionKey: String
+    private let historyStore: ChatHistoryStoring?
     private var streamTask: Task<Void, Never>?
     private var activeRuns: [String: Int] = [:]
     private var lastSeqByRun: [String: Int] = [:]
 
-    public init(chat: ChatServiceType) {
+    public init(chat: ChatServiceType, sessionKey: String = "main", historyStore: ChatHistoryStoring? = nil) {
         self.chat = chat
+        self.sessionKey = sessionKey
+        self.historyStore = historyStore
+    }
+
+    public func loadCachedHistory() async {
+        guard let historyStore else { return }
+        let cached = await historyStore.load(sessionKey: sessionKey)
+#if DEBUG
+        print("[ChatHistory] cached loaded: \(cached.count)")
+#endif
+        messages = cached
     }
 
     public func loadHistory() async throws {
-        messages = try await chat.history(sessionKey: sessionKey)
+        let remote = try await chat.history(sessionKey: sessionKey)
+#if DEBUG
+        print("[ChatHistory] remote loaded: \(remote.count)")
+#endif
+        if messages.isEmpty {
+            if remote.isEmpty {
+                if let historyStore {
+                    messages = await historyStore.load(sessionKey: sessionKey)
+                }
+                return
+            }
+            messages = remote
+            if let historyStore {
+                await historyStore.save(sessionKey: sessionKey, messages: remote)
+            }
+            return
+        }
+        if !remote.isEmpty {
+            return
+        }
     }
 
     public func startStreaming() {
@@ -117,6 +152,15 @@ public final class ChatViewModel {
             let message = ChatMessage(role: .assistant, text: text, state: state)
             messages.append(message)
             activeRuns[runId] = messages.count - 1
+        }
+    }
+
+    private func persistMessages() {
+        guard let historyStore else { return }
+        let snapshot = messages
+        let key = sessionKey
+        Task {
+            await historyStore.save(sessionKey: key, messages: snapshot)
         }
     }
 }

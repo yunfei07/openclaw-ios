@@ -34,6 +34,29 @@ final class MockChatService: ChatServiceType, @unchecked Sendable {
     }
 }
 
+actor InMemoryChatHistoryStore: ChatHistoryStoring {
+    private(set) var savedMessages: [ChatMessage] = []
+    private var storedMessages: [ChatMessage]
+
+    init(storedMessages: [ChatMessage] = []) {
+        self.storedMessages = storedMessages
+    }
+
+    func load(sessionKey: String) async -> [ChatMessage] {
+        storedMessages
+    }
+
+    func save(sessionKey: String, messages: [ChatMessage]) async {
+        savedMessages = messages
+        storedMessages = messages
+    }
+
+    func clear(sessionKey: String) async {
+        savedMessages = []
+        storedMessages = []
+    }
+}
+
 @MainActor
 struct ChatViewModelTests {
     @Test func sendAppendsUserMessage() async throws {
@@ -80,5 +103,44 @@ struct ChatViewModelTests {
         try await Task.sleep(nanoseconds: 20_000_000)
         #expect(vm.messages.last?.text == "Hello")
         #expect(vm.messages.last?.state == .sent)
+    }
+
+    @Test func loadHistoryUsesCachedMessagesWhenRemoteEmpty() async throws {
+        let chat = MockChatService()
+        chat.historyResult = []
+        let cached = [ChatMessage(id: "local", role: .user, text: "cached", state: .sent)]
+        let store = InMemoryChatHistoryStore(storedMessages: cached)
+        let vm = ChatViewModel(chat: chat, historyStore: store)
+
+        try await vm.loadHistory()
+
+        #expect(vm.messages == cached)
+    }
+
+    @Test func loadHistoryPersistsRemoteMessages() async throws {
+        let chat = MockChatService()
+        let remote = [ChatMessage(id: "remote", role: .assistant, text: "hello", state: .sent)]
+        chat.historyResult = remote
+        let store = InMemoryChatHistoryStore()
+        let vm = ChatViewModel(chat: chat, historyStore: store)
+
+        try await vm.loadHistory()
+        let saved = await store.savedMessages
+
+        #expect(saved == remote)
+    }
+
+    @Test func loadHistoryKeepsCachedMessagesWhenAlreadyLoaded() async throws {
+        let chat = MockChatService()
+        let remote = [ChatMessage(id: "remote", role: .assistant, text: "server", state: .sent)]
+        chat.historyResult = remote
+        let cached = [ChatMessage(id: "local", role: .user, text: "cached", state: .sent)]
+        let store = InMemoryChatHistoryStore(storedMessages: cached)
+        let vm = ChatViewModel(chat: chat, historyStore: store)
+
+        await vm.loadCachedHistory()
+        try await vm.loadHistory()
+
+        #expect(vm.messages == cached)
     }
 }

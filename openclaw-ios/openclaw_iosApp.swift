@@ -17,6 +17,9 @@ struct openclaw_iosApp: App {
     private let connectAction: () async -> Void
 
     init() {
+        if #available(iOS 15.0, *) {
+            UITableView.appearance().sectionHeaderTopPadding = 0
+        }
         let secrets = KeychainSecretStore()
         let settingsStore = SettingsStore(secrets: secrets)
         let settingsVM = SettingsViewModel(store: settingsStore)
@@ -27,12 +30,14 @@ struct openclaw_iosApp: App {
         let url = URL(string: urlString) ?? URL(string: "ws://127.0.0.1:18789")!
         let connection = GatewayConnection(url: url, tokenStore: tokenStore, identityStore: identityStore)
         let chatService = ChatServiceAdapter(gateway: connection)
-        let chatVM = ChatViewModel(chat: chatService)
+        let historyStore = FileChatHistoryStore()
+        let chatVM = ChatViewModel(chat: chatService, historyStore: historyStore)
 
         _settings = State(initialValue: settingsVM)
         _chat = State(initialValue: chatVM)
 
         connectAction = {
+            await chatVM.loadCachedHistory()
             let token = await MainActor.run {
                 settingsVM.gatewayToken.isEmpty ? nil : settingsVM.gatewayToken
             }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4830C804A9D043A49D0ECF1E /* ExyteChat in Frameworks */ = {isa = PBXBuildFile; productRef = 7F259104DC5146838368DFFE /* ExyteChat */; };
 		88DD59D99FE2C7A1CF50093B /* OpenClawClientCore in Frameworks */ = {isa = PBXBuildFile; productRef = 726D60BF053990FAB4AAFC36 /* OpenClawClientCore */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				88DD59D99FE2C7A1CF50093B /* OpenClawClientCore in Frameworks */,
+				4830C804A9D043A49D0ECF1E /* ExyteChat in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = "openclaw-ios";
 			packageProductDependencies = (
 				726D60BF053990FAB4AAFC36 /* OpenClawClientCore */,
+				7F259104DC5146838368DFFE /* ExyteChat */,
 			);
 			productName = "openclaw-ios";
 			productReference = E8107F502F2CECB2005D5869 /* openclaw-ios.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				1B39B664A54E2BCA37CCB18C /* XCLocalSwiftPackageReference "Packages/OpenClawClientCore" */,
+				D5BBB44D00F84FE285432109 /* XCRemoteSwiftPackageReference "Chat" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E8107F512F2CECB2005D5869 /* Products */;
@@ -265,7 +269,7 @@
 				DEVELOPMENT_TEAM = JKNM3EVDKU;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Config/Info.plist";
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -298,7 +302,7 @@
 				DEVELOPMENT_TEAM = JKNM3EVDKU;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Config/Info.plist";
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -351,11 +355,27 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		D5BBB44D00F84FE285432109 /* XCRemoteSwiftPackageReference "Chat" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/exyte/Chat.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		726D60BF053990FAB4AAFC36 /* OpenClawClientCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 1B39B664A54E2BCA37CCB18C /* XCLocalSwiftPackageReference "Packages/OpenClawClientCore" */;
 			productName = OpenClawClientCore;
+		};
+		7F259104DC5146838368DFFE /* ExyteChat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5BBB44D00F84FE285432109 /* XCRemoteSwiftPackageReference "Chat" */;
+			productName = ExyteChat;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
