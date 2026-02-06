@@ -49,7 +49,12 @@ public final class ChatViewModel {
 #if DEBUG
         print("[ChatHistory] cached loaded: \(cached.count)")
 #endif
-        messages = cached
+        if messages.isEmpty {
+            messages = cached
+            return
+        }
+        guard !cached.isEmpty else { return }
+        messages = merge(remote: cached, local: messages)
     }
 
     public func loadHistory() async throws {
@@ -57,21 +62,25 @@ public final class ChatViewModel {
 #if DEBUG
         print("[ChatHistory] remote loaded: \(remote.count)")
 #endif
-        if messages.isEmpty {
-            if remote.isEmpty {
-                if let historyStore {
-                    messages = await historyStore.load(sessionKey: sessionKey)
-                }
-                return
+        if remote.isEmpty {
+            if messages.isEmpty, let historyStore {
+                messages = await historyStore.load(sessionKey: sessionKey)
             }
+            return
+        }
+
+        if messages.isEmpty {
             messages = remote
             if let historyStore {
                 await historyStore.save(sessionKey: sessionKey, messages: remote)
             }
             return
         }
-        if !remote.isEmpty {
-            return
+
+        let merged = merge(remote: remote, local: messages)
+        messages = merged
+        if let historyStore {
+            await historyStore.save(sessionKey: sessionKey, messages: merged)
         }
     }
 
@@ -92,20 +101,42 @@ public final class ChatViewModel {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         inputText = ""
-        let pendingUser = ChatMessage(role: .user, text: text, state: .sending)
+        let pendingUser = ChatMessage(role: .user, text: text, state: .sending, createdAt: Date())
         messages.append(pendingUser)
         let userIndex = messages.indices.last
         do {
             let result = try await chat.send(sessionKey: sessionKey, message: text, thinking: "low", idempotencyKey: UUID().uuidString)
             if let idx = userIndex {
-                messages[idx] = ChatMessage(id: messages[idx].id, role: .user, text: text, state: .sent)
+                let existing = messages[idx]
+                messages[idx] = ChatMessage(
+                    id: existing.id,
+                    role: .user,
+                    text: text,
+                    state: .sent,
+                    createdAt: existing.createdAt,
+                    replyTo: existing.replyTo,
+                    forwardedFrom: existing.forwardedFrom,
+                    isEdited: existing.isEdited,
+                    localDeleted: existing.localDeleted
+                )
             }
-            let assistant = ChatMessage(role: .assistant, text: "", state: .sending)
+            let assistant = ChatMessage(role: .assistant, text: "", state: .sending, createdAt: Date())
             messages.append(assistant)
             activeRuns[result.runId] = messages.count - 1
         } catch {
             if let idx = userIndex {
-                messages[idx] = ChatMessage(id: messages[idx].id, role: .user, text: text, state: .failed)
+                let existing = messages[idx]
+                messages[idx] = ChatMessage(
+                    id: existing.id,
+                    role: .user,
+                    text: text,
+                    state: .failed,
+                    createdAt: existing.createdAt,
+                    replyTo: existing.replyTo,
+                    forwardedFrom: existing.forwardedFrom,
+                    isEdited: existing.isEdited,
+                    localDeleted: existing.localDeleted
+                )
             }
             throw error
         }
@@ -130,13 +161,33 @@ public final class ChatViewModel {
                 upsertAssistant(runId: event.runId, text: text, state: .sent)
             } else if let idx = activeRuns[event.runId] {
                 let existing = messages[idx]
-                messages[idx] = ChatMessage(id: existing.id, role: .assistant, text: existing.text, state: .sent)
+                messages[idx] = ChatMessage(
+                    id: existing.id,
+                    role: .assistant,
+                    text: existing.text,
+                    state: .sent,
+                    createdAt: existing.createdAt,
+                    replyTo: existing.replyTo,
+                    forwardedFrom: existing.forwardedFrom,
+                    isEdited: existing.isEdited,
+                    localDeleted: existing.localDeleted
+                )
             }
             activeRuns.removeValue(forKey: event.runId)
         case .error:
             if let idx = activeRuns[event.runId] {
                 let existing = messages[idx]
-                messages[idx] = ChatMessage(id: existing.id, role: .assistant, text: existing.text, state: .failed)
+                messages[idx] = ChatMessage(
+                    id: existing.id,
+                    role: .assistant,
+                    text: existing.text,
+                    state: .failed,
+                    createdAt: existing.createdAt,
+                    replyTo: existing.replyTo,
+                    forwardedFrom: existing.forwardedFrom,
+                    isEdited: existing.isEdited,
+                    localDeleted: existing.localDeleted
+                )
             }
             activeRuns.removeValue(forKey: event.runId)
             errorMessage = event.errorMessage
@@ -147,12 +198,63 @@ public final class ChatViewModel {
 
     private func upsertAssistant(runId: String, text: String, state: ChatDeliveryState) {
         if let idx = activeRuns[runId] {
-            messages[idx] = ChatMessage(id: messages[idx].id, role: .assistant, text: text, state: state)
+            let existing = messages[idx]
+            messages[idx] = ChatMessage(
+                id: existing.id,
+                role: .assistant,
+                text: text,
+                state: state,
+                createdAt: existing.createdAt,
+                replyTo: existing.replyTo,
+                forwardedFrom: existing.forwardedFrom,
+                isEdited: existing.isEdited,
+                localDeleted: existing.localDeleted
+            )
         } else {
-            let message = ChatMessage(role: .assistant, text: text, state: state)
+            let message = ChatMessage(role: .assistant, text: text, state: state, createdAt: Date())
             messages.append(message)
             activeRuns[runId] = messages.count - 1
         }
+    }
+
+    private func merge(remote: [ChatMessage], local: [ChatMessage]) -> [ChatMessage] {
+        let maxRemoteDate = remote.map(\.createdAt).max() ?? .distantPast
+        var combined = remote
+        var indexByFingerprint: [String: Int] = [:]
+        for (idx, message) in remote.enumerated() {
+            indexByFingerprint[fingerprint(message)] = idx
+        }
+
+        for message in local {
+            let keep = message.state != .sent || message.hasLocalMetadata || message.createdAt > maxRemoteDate
+            guard keep else { continue }
+            let key = fingerprint(message)
+            if let idx = indexByFingerprint[key] {
+                if message.hasLocalMetadata {
+                    combined[idx] = message
+                }
+                if message.state != .sent {
+                    combined.append(message)
+                }
+                continue
+            }
+            combined.append(message)
+            if message.state == .sent || message.hasLocalMetadata {
+                indexByFingerprint[key] = combined.count - 1
+            }
+        }
+
+        return combined.sorted {
+            if $0.createdAt != $1.createdAt {
+                return $0.createdAt < $1.createdAt
+            }
+            return $0.id < $1.id
+        }
+    }
+
+    private func fingerprint(_ message: ChatMessage) -> String {
+        let ts = Int(message.createdAt.timeIntervalSince1970 * 1000)
+        return "\(message.role.rawValue)|\(ts)|\(message.text)"
     }
 
     private func persistMessages() {

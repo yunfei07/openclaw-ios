@@ -141,6 +141,43 @@ struct ChatViewModelTests {
         await vm.loadCachedHistory()
         try await vm.loadHistory()
 
-        #expect(vm.messages == cached)
+        #expect(vm.messages.contains(cached[0]))
+        #expect(vm.messages.contains(where: { $0.id == "remote" }))
+        #expect(vm.messages.count == 2)
+    }
+
+    @Test func loadHistoryMergesRemoteAndLocalPreservingMetadata() async throws {
+        let chat = MockChatService()
+        let remote = [ChatMessage(id: "remote", role: .assistant, text: "server", state: .sent, createdAt: Date(timeIntervalSince1970: 10))]
+        chat.historyResult = remote
+        let vm = ChatViewModel(chat: chat)
+        let local = ChatMessage(
+            id: "local",
+            role: .user,
+            text: "hi",
+            state: .sent,
+            createdAt: Date(timeIntervalSince1970: 12),
+            forwardedFrom: "Alice"
+        )
+        vm.messages = [local]
+
+        try await vm.loadHistory()
+
+        #expect(vm.messages.contains(local))
+        #expect(vm.messages.contains(where: { $0.id == "remote" }))
+    }
+
+    @Test func loadCachedHistoryPreservesPendingMessages() async throws {
+        let chat = MockChatService()
+        let cached = [ChatMessage(id: "cached", role: .assistant, text: "old", state: .sent, createdAt: Date(timeIntervalSince1970: 1))]
+        let store = InMemoryChatHistoryStore(storedMessages: cached)
+        let vm = ChatViewModel(chat: chat, historyStore: store)
+        let pending = ChatMessage(id: "pending", role: .user, text: "new", state: .sending, createdAt: Date(timeIntervalSince1970: 2))
+        vm.messages = [pending]
+
+        await vm.loadCachedHistory()
+
+        #expect(vm.messages.contains(pending))
+        #expect(vm.messages.contains(where: { $0.id == "cached" }))
     }
 }
