@@ -21,7 +21,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            ChatView(messages: exyteMessages, chatType: .conversation, messageBuilder: buildMessage, messageMenuAction: { action, defaultActionClosure, message in
+            ChatView(messages: exyteMessages, chatType: .conversation, didSendMessage: handleDraftMessage, messageBuilder: buildMessage, messageMenuAction: { action, defaultActionClosure, message in
                 handleMenuAction(action: action, defaultActionClosure: defaultActionClosure, message: message)
             })
                 .showDateHeaders(false)
