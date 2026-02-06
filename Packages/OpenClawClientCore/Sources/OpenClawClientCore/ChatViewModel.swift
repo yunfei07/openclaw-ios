@@ -142,6 +142,42 @@ public final class ChatViewModel {
         }
     }
 
+    public func updateMessageText(id: String, newText: String) {
+        let trimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
+        let existing = messages[idx]
+        guard existing.state != .sent else { return }
+        messages[idx] = ChatMessage(
+            id: existing.id,
+            role: existing.role,
+            text: trimmed,
+            state: existing.state,
+            createdAt: existing.createdAt,
+            replyTo: existing.replyTo,
+            forwardedFrom: existing.forwardedFrom,
+            isEdited: true,
+            localDeleted: existing.localDeleted
+        )
+    }
+
+    public func markMessageDeleted(id: String) {
+        guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
+        let existing = messages[idx]
+        guard existing.state != .sent else { return }
+        messages[idx] = ChatMessage(
+            id: existing.id,
+            role: existing.role,
+            text: "",
+            state: existing.state,
+            createdAt: existing.createdAt,
+            replyTo: existing.replyTo,
+            forwardedFrom: existing.forwardedFrom,
+            isEdited: existing.isEdited,
+            localDeleted: true
+        )
+    }
+
     private func handle(event: ChatEvent) {
         guard event.sessionKey == sessionKey else { return }
         if let seq = event.seq {

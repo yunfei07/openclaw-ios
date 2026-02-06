@@ -180,4 +180,28 @@ struct ChatViewModelTests {
         #expect(vm.messages.contains(pending))
         #expect(vm.messages.contains(where: { $0.id == "cached" }))
     }
+
+    @Test func updateMessageTextMarksEdited() async throws {
+        let chat = MockChatService()
+        let vm = ChatViewModel(chat: chat)
+        let message = ChatMessage(id: "m1", role: .user, text: "draft", state: .sending, createdAt: Date(timeIntervalSince1970: 1))
+        vm.messages = [message]
+
+        vm.updateMessageText(id: "m1", newText: "edited")
+
+        #expect(vm.messages[0].text == "edited")
+        #expect(vm.messages[0].isEdited)
+    }
+
+    @Test func markMessageDeletedReplacesText() async throws {
+        let chat = MockChatService()
+        let vm = ChatViewModel(chat: chat)
+        let message = ChatMessage(id: "m2", role: .user, text: "draft", state: .failed, createdAt: Date(timeIntervalSince1970: 1))
+        vm.messages = [message]
+
+        vm.markMessageDeleted(id: "m2")
+
+        #expect(vm.messages[0].text.isEmpty)
+        #expect(vm.messages[0].localDeleted)
+    }
 }
