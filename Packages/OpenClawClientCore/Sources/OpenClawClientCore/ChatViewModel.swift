@@ -98,20 +98,33 @@ public final class ChatViewModel {
     }
 
     public func sendMessage() async throws {
-        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
         inputText = ""
-        let pendingUser = ChatMessage(role: .user, text: text, state: .sending, createdAt: Date())
+        try await sendMessage(text: trimmed, replyTo: nil, forwardedFrom: nil)
+    }
+
+    public func sendMessage(text: String, replyTo: ChatMessageQuote?, forwardedFrom: String?) async throws {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let pendingUser = ChatMessage(
+            role: .user,
+            text: trimmed,
+            state: .sending,
+            createdAt: Date(),
+            replyTo: replyTo,
+            forwardedFrom: forwardedFrom
+        )
         messages.append(pendingUser)
         let userIndex = messages.indices.last
         do {
-            let result = try await chat.send(sessionKey: sessionKey, message: text, thinking: "low", idempotencyKey: UUID().uuidString)
+            let result = try await chat.send(sessionKey: sessionKey, message: trimmed, thinking: "low", idempotencyKey: UUID().uuidString)
             if let idx = userIndex {
                 let existing = messages[idx]
                 messages[idx] = ChatMessage(
                     id: existing.id,
                     role: .user,
-                    text: text,
+                    text: trimmed,
                     state: .sent,
                     createdAt: existing.createdAt,
                     replyTo: existing.replyTo,
@@ -129,7 +142,7 @@ public final class ChatViewModel {
                 messages[idx] = ChatMessage(
                     id: existing.id,
                     role: .user,
-                    text: text,
+                    text: trimmed,
                     state: .failed,
                     createdAt: existing.createdAt,
                     replyTo: existing.replyTo,
