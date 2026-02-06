@@ -17,16 +17,19 @@ struct ContentView: View {
     @State private var showingSettings = false
     @State private var showUnsupportedAlert = false
     @State private var exyteMessages: [ExyteChat.Message] = []
-    @State private var createdAtByMessageId: [String: Date] = [:]
+    @State private var localMessagesById: [String: ChatMessage] = [:]
 
     var body: some View {
         NavigationStack {
-            ChatView(messages: exyteMessages, chatType: .conversation, didSendMessage: handleDraftMessage)
+            ChatView(messages: exyteMessages, chatType: .conversation, messageBuilder: buildMessage, messageMenuAction: { action, defaultActionClosure, message in
+                handleMenuAction(action: action, defaultActionClosure: defaultActionClosure, message: message)
+            })
                 .showDateHeaders(false)
                 .keyboardDismissMode(.interactive)
                 .navigationTitle("OpenClaw")
                 .navigationBarTitleDisplayMode(.inline)
                 .background(ChatTableViewTuner())
+                .background(ChatUIStyle.background)
                 .toolbar {
                     Button("设置") {
                         showingSettings = true
@@ -59,9 +62,11 @@ struct ContentView: View {
         }
         let trimmed = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        chat.inputText = trimmed
+        let replyQuote = draft.replyMessage.map {
+            ChatMessageQuote(id: $0.id, author: $0.user.name, text: $0.text)
+        }
         Task {
-            try? await chat.sendMessage()
+            try? await chat.sendMessage(text: trimmed, replyTo: replyQuote, forwardedFrom: nil)
         }
     }
 
@@ -71,17 +76,11 @@ struct ContentView: View {
 
     @MainActor
     private func updateMessages(from messages: [ChatMessage]) {
-        var updatedCreatedAt = createdAtByMessageId
-        let mapped = messages.map { message in
-            let createdAt = updatedCreatedAt[message.id] ?? Date()
-            updatedCreatedAt[message.id] = createdAt
-            return mapMessage(message, createdAt: createdAt)
-        }
-        createdAtByMessageId = updatedCreatedAt
-        exyteMessages = mapped
+        localMessagesById = Dictionary(messages.map { ($0.id, $0) }, uniquingKeysWith: { _, newest in newest })
+        exyteMessages = messages.map { mapMessage($0) }
     }
 
-    private func mapMessage(_ message: ChatMessage, createdAt: Date) -> ExyteChat.Message {
+    private func mapMessage(_ message: ChatMessage) -> ExyteChat.Message {
         let user: ExyteChat.User
         switch message.role {
         case .user:
@@ -107,18 +106,86 @@ struct ContentView: View {
                 giphyMedia: nil,
                 recording: nil,
                 replyMessage: nil,
-                createdAt: createdAt
+                createdAt: message.createdAt
             )
             status = .error(draft)
+        }
+
+        let replyMessage = message.replyTo.map {
+            ReplyMessage(
+                id: $0.id,
+                user: ExyteChat.User(id: "reply-\($0.id)", name: $0.author, avatarURL: nil, isCurrentUser: false),
+                createdAt: message.createdAt,
+                text: $0.text
+            )
         }
 
         return ExyteChat.Message(
             id: message.id,
             user: user,
             status: status,
-            createdAt: createdAt,
-            text: message.text
+            createdAt: message.createdAt,
+            text: message.text,
+            replyMessage: replyMessage
         )
+    }
+
+    private func buildMessage(
+        _ message: ExyteChat.Message,
+        _ positionInGroup: PositionInUserGroup,
+        _ positionInSection: PositionInMessagesSection,
+        _ _: CommentsPosition?,
+        _ showContextMenu: @escaping () -> Void,
+        _ _: @escaping (ExyteChat.Message, DefaultMessageMenuAction) -> Void,
+        _ _: @escaping (Attachment) -> Void
+    ) -> some View {
+        TelegramMessageRowView(
+            message: message,
+            localMessage: localMessagesById[message.id],
+            positionInGroup: positionInGroup,
+            positionInSection: positionInSection,
+            onLongPress: showContextMenu
+        )
+    }
+
+    private func handleMenuAction(
+        action: TelegramMenuAction,
+        defaultActionClosure: @escaping (ExyteChat.Message, DefaultMessageMenuAction) -> Void,
+        message: ExyteChat.Message
+    ) {
+        switch action {
+        case .copy:
+            defaultActionClosure(message, .copy)
+        case .reply:
+            defaultActionClosure(message, .reply)
+        case .forward:
+            sendForwarded(message)
+        case .edit:
+            guard canEditMessage(message) else { return }
+            defaultActionClosure(message, .edit { editedText in
+                chat.updateMessageText(id: message.id, newText: editedText)
+            })
+        case .delete:
+            chat.markMessageDeleted(id: message.id)
+        }
+    }
+
+    private func canEditMessage(_ message: ExyteChat.Message) -> Bool {
+        guard message.user.isCurrentUser else { return false }
+        switch message.status {
+        case .sending, .error:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func sendForwarded(_ message: ExyteChat.Message) {
+        let text = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        Task {
+            try? await chat.sendMessage(text: text, replyTo: nil, forwardedFrom: message.user.name)
+        }
     }
 }
 
@@ -143,4 +210,61 @@ private struct PreviewChatService: ChatServiceType, Sendable {
 private enum PreviewFactory {
     static let settings = SettingsViewModel(store: SettingsStore(secrets: InMemorySecretStore()))
     static let chat = ChatViewModel(chat: PreviewChatService())
+}
+
+private enum TelegramMenuAction: MessageMenuAction {
+    case copy
+    case reply
+    case forward
+    case edit
+    case delete
+
+    func title() -> String {
+        switch self {
+        case .copy:
+            return "复制"
+        case .reply:
+            return "回复"
+        case .forward:
+            return "转发"
+        case .edit:
+            return "编辑"
+        case .delete:
+            return "删除"
+        }
+    }
+
+    func icon() -> Image {
+        switch self {
+        case .copy:
+            return Image(systemName: "doc.on.doc")
+        case .reply:
+            return Image(systemName: "arrowshape.turn.up.left")
+        case .forward:
+            return Image(systemName: "arrowshape.turn.up.right")
+        case .edit:
+            if #available(iOS 18.0, macCatalyst 18.0, *) {
+                return Image(systemName: "bubble.and.pencil")
+            }
+            return Image(systemName: "square.and.pencil")
+        case .delete:
+            return Image(systemName: "trash")
+        }
+    }
+
+    static func menuItems(for message: ExyteChat.Message) -> [TelegramMenuAction] {
+        var items: [TelegramMenuAction] = [.copy, .reply, .forward]
+        let canEdit: Bool
+        switch message.status {
+        case .sending, .error:
+            canEdit = true
+        default:
+            canEdit = false
+        }
+        if message.user.isCurrentUser && canEdit {
+            items.append(.edit)
+            items.append(.delete)
+        }
+        return items
+    }
 }

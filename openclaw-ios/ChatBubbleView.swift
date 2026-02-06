@@ -1,16 +1,23 @@
 import SwiftUI
 
-struct ChatBubbleView: View {
-    let text: String
+struct ChatBubbleView<Content: View>: View {
     let isOutgoing: Bool
+    let showTail: Bool
+    let content: Content
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     private var maxBubbleWidth: CGFloat {
-        horizontalSizeClass == .regular ? 420 : 280
+        horizontalSizeClass == .regular ? 420 : 300
     }
-    private let tailWidth: CGFloat = 8
-    private let tailHeight: CGFloat = 10
-    private let tailTipInset: CGFloat = 1.5
+    private var tailWidth: CGFloat { showTail ? 8 : 0 }
+    private var tailHeight: CGFloat { showTail ? 10 : 0 }
+    private var tailTipInset: CGFloat { showTail ? 1.5 : 0 }
+
+    init(isOutgoing: Bool, showTail: Bool, @ViewBuilder content: () -> Content) {
+        self.isOutgoing = isOutgoing
+        self.showTail = showTail
+        self.content = content()
+    }
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -22,12 +29,8 @@ struct ChatBubbleView: View {
     }
 
     private var bubbleBody: some View {
-        Text(text)
-            .font(.system(.body, design: .rounded))
-            .foregroundStyle(bubbleText)
-            .lineSpacing(3)
-            .multilineTextAlignment(.leading)
-            .padding(.vertical, 10)
+        content
+            .padding(.vertical, 8)
             .padding(.leading, isOutgoing ? 12 : 12 + tailWidth)
             .padding(.trailing, isOutgoing ? 12 + tailWidth : 12)
             .background(bubbleFill)
@@ -36,7 +39,7 @@ struct ChatBubbleView: View {
                 bubbleShape
                     .stroke(bubbleBorder, lineWidth: 0.6)
             )
-            .shadow(color: ChatUIStyle.bubbleShadow, radius: 3, x: 0, y: 1)
+            .shadow(color: ChatUIStyle.bubbleShadow, radius: 2, x: 0, y: 1)
     }
 
     private var bubbleFill: Color {
@@ -45,10 +48,6 @@ struct ChatBubbleView: View {
 
     private var bubbleBorder: Color {
         isOutgoing ? ChatUIStyle.bubbleOutgoingBorder : ChatUIStyle.bubbleIncomingBorder
-    }
-
-    private var bubbleText: Color {
-        isOutgoing ? ChatUIStyle.bubbleOutgoingText : ChatUIStyle.bubbleIncomingText
     }
 
     private var bubbleShape: BubbleShape {
