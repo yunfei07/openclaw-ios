@@ -166,9 +166,8 @@ struct TelegramMessageRowView: View {
         return isOutgoing ? ChatUIStyle.bubbleOutgoingText : ChatUIStyle.bubbleIncomingText
     }
 
-    @ViewBuilder
     private func statusIcon(for status: ExyteChat.Message.Status) -> some View {
-        let image: Image?
+        let image: Image
         let color: Color
         switch status {
         case .sending:
@@ -187,10 +186,8 @@ struct TelegramMessageRowView: View {
             image = Image(systemName: "exclamationmark.circle.fill")
             color = ChatUIStyle.errorText
         }
-        if let image {
-            image
-                .foregroundStyle(color)
-        }
+        return image
+            .foregroundStyle(color)
     }
 
     private static let timeFormatter: DateFormatter = {
